@@ -67,6 +67,15 @@ var ErrNodeNameNotUnique = errors.New("node name is not unique")
 // ErrRegistrationExpired is returned when a registration has expired.
 var ErrRegistrationExpired = errors.New("registration expired")
 
+// ErrMultipleIPv4Addresses is returned when multiple IPv4 addresses are provided.
+var ErrMultipleIPv4Addresses = errors.New("multiple IPv4 addresses provided")
+
+// ErrMultipleIPv6Addresses is returned when multiple IPv6 addresses are provided.
+var ErrMultipleIPv6Addresses = errors.New("multiple IPv6 addresses provided")
+
+// ErrIPAddressInUse is returned when an IP address is already in use by another node.
+var ErrIPAddressInUse = errors.New("IP address already in use")
+
 // sshCheckPair identifies a (source, destination) node pair for
 // SSH check auth tracking.
 type sshCheckPair struct {
@@ -834,6 +843,95 @@ func (s *State) RenameNode(nodeID types.NodeID, newName string) (types.NodeView,
 	}
 
 	return s.persistNodeToDB(n)
+}
+
+// SetNodeIPs sets the IP addresses for a node.
+// It only updates the IPs provided in the list. If an address family (v4 or v6)
+// is not present in the list, the existing IP for that family is preserved.
+func (s *State) SetNodeIPs(nodeID types.NodeID, ips []string) (types.NodeView, change.Change, error) {
+	var newV4 *netip.Addr
+
+	var newV6 *netip.Addr
+
+	for _, ipStr := range ips {
+		ip, err := netip.ParseAddr(ipStr)
+		if err != nil {
+			return types.NodeView{}, change.Change{}, fmt.Errorf("invalid IP %q: %w", ipStr, err)
+		}
+
+		if ip.Is4() {
+			if newV4 != nil {
+				return types.NodeView{}, change.Change{}, ErrMultipleIPv4Addresses
+			}
+
+			newV4 = &ip
+		} else if ip.Is6() {
+			if newV6 != nil {
+				return types.NodeView{}, change.Change{}, ErrMultipleIPv6Addresses
+			}
+
+			newV6 = &ip
+		}
+	}
+
+	// Check for conflicts
+	allNodes := s.nodeStore.ListNodes()
+	for _, n := range allNodes.All() {
+		if n.ID() == nodeID {
+			continue
+		}
+
+		node := n.AsStruct()
+		if newV4 != nil && node.IPv4 != nil && *newV4 == *node.IPv4 {
+			return types.NodeView{}, change.Change{}, fmt.Errorf("%w: IPv4 %s by node %s", ErrIPAddressInUse, *newV4, n.Hostname())
+		}
+
+		if newV6 != nil && node.IPv6 != nil && *newV6 == *node.IPv6 {
+			return types.NodeView{}, change.Change{}, fmt.Errorf("%w: IPv6 %s by node %s", ErrIPAddressInUse, *newV6, n.Hostname())
+		}
+	}
+
+	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
+		if newV4 != nil {
+			node.IPv4 = newV4
+		}
+
+		if newV6 != nil {
+			node.IPv6 = newV6
+		}
+	})
+
+	if !ok {
+		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotFound, nodeID)
+	}
+
+	logEvent := log.Info().
+		Caller().
+		EmbedObject(n).
+		Strs("ips", ips)
+
+	if newV4 != nil {
+		logEvent = logEvent.Str("new_ipv4", newV4.String())
+	}
+	if newV6 != nil {
+		logEvent = logEvent.Str("new_ipv6", newV6.String())
+	}
+
+	logEvent.Msg("Setting node IPs")
+
+	// Persist the node changes to the database
+	nodeView, c, err := s.persistNodeToDB(n)
+	if err != nil {
+		return types.NodeView{}, change.Change{}, err
+	}
+
+	// If the changeset isn't already a full update, trigger a policy change
+	// to ensure all nodes get updated network maps with the new IPs
+	if !c.IsFull() {
+		c = change.PolicyChange()
+	}
+
+	return nodeView, c, nil
 }
 
 // BackfillNodeIPs assigns IP addresses to nodes that don't have them.

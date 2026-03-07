@@ -570,6 +570,26 @@ func nodesToProto(state *state.State, nodes views.Slice[types.NodeView]) []*v1.N
 	return response
 }
 
+func (api headscaleV1APIServer) SetNodeIP(
+	ctx context.Context,
+	request *v1.SetNodeIPRequest,
+) (*v1.SetNodeIPResponse, error) {
+	log.Trace().
+		Caller().
+		Uint64(zf.NodeID, request.GetNodeId()).
+		Strs("ips", request.GetIpAddresses()).
+		Msg("gRPC SetNodeIP called")
+
+	node, nodeChange, err := api.h.state.SetNodeIPs(types.NodeID(request.GetNodeId()), request.GetIpAddresses())
+	if err != nil {
+		return nil, err
+	}
+
+	api.h.Change(nodeChange)
+
+	return &v1.SetNodeIPResponse{Node: node.Proto()}, nil
+}
+
 func (api headscaleV1APIServer) BackfillNodeIPs(
 	ctx context.Context,
 	request *v1.BackfillNodeIPsRequest,
