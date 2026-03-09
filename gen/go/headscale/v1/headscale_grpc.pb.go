@@ -37,6 +37,7 @@ const (
 	HeadscaleService_RenameNode_FullMethodName        = "/headscale.v1.HeadscaleService/RenameNode"
 	HeadscaleService_ListNodes_FullMethodName         = "/headscale.v1.HeadscaleService/ListNodes"
 	HeadscaleService_BackfillNodeIPs_FullMethodName   = "/headscale.v1.HeadscaleService/BackfillNodeIPs"
+	HeadscaleService_SetNodeIP_FullMethodName         = "/headscale.v1.HeadscaleService/SetNodeIP"
 	HeadscaleService_AuthRegister_FullMethodName      = "/headscale.v1.HeadscaleService/AuthRegister"
 	HeadscaleService_AuthApprove_FullMethodName       = "/headscale.v1.HeadscaleService/AuthApprove"
 	HeadscaleService_AuthReject_FullMethodName        = "/headscale.v1.HeadscaleService/AuthReject"
@@ -74,6 +75,7 @@ type HeadscaleServiceClient interface {
 	RenameNode(ctx context.Context, in *RenameNodeRequest, opts ...grpc.CallOption) (*RenameNodeResponse, error)
 	ListNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*ListNodesResponse, error)
 	BackfillNodeIPs(ctx context.Context, in *BackfillNodeIPsRequest, opts ...grpc.CallOption) (*BackfillNodeIPsResponse, error)
+	SetNodeIP(ctx context.Context, in *SetNodeIPRequest, opts ...grpc.CallOption) (*SetNodeIPResponse, error)
 	// --- Auth start ---
 	AuthRegister(ctx context.Context, in *AuthRegisterRequest, opts ...grpc.CallOption) (*AuthRegisterResponse, error)
 	AuthApprove(ctx context.Context, in *AuthApproveRequest, opts ...grpc.CallOption) (*AuthApproveResponse, error)
@@ -278,6 +280,16 @@ func (c *headscaleServiceClient) BackfillNodeIPs(ctx context.Context, in *Backfi
 	return out, nil
 }
 
+func (c *headscaleServiceClient) SetNodeIP(ctx context.Context, in *SetNodeIPRequest, opts ...grpc.CallOption) (*SetNodeIPResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetNodeIPResponse)
+	err := c.cc.Invoke(ctx, HeadscaleService_SetNodeIP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *headscaleServiceClient) AuthRegister(ctx context.Context, in *AuthRegisterRequest, opts ...grpc.CallOption) (*AuthRegisterResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AuthRegisterResponse)
@@ -403,6 +415,7 @@ type HeadscaleServiceServer interface {
 	RenameNode(context.Context, *RenameNodeRequest) (*RenameNodeResponse, error)
 	ListNodes(context.Context, *ListNodesRequest) (*ListNodesResponse, error)
 	BackfillNodeIPs(context.Context, *BackfillNodeIPsRequest) (*BackfillNodeIPsResponse, error)
+	SetNodeIP(context.Context, *SetNodeIPRequest) (*SetNodeIPResponse, error)
 	// --- Auth start ---
 	AuthRegister(context.Context, *AuthRegisterRequest) (*AuthRegisterResponse, error)
 	AuthApprove(context.Context, *AuthApproveRequest) (*AuthApproveResponse, error)
@@ -480,6 +493,9 @@ func (UnimplementedHeadscaleServiceServer) ListNodes(context.Context, *ListNodes
 }
 func (UnimplementedHeadscaleServiceServer) BackfillNodeIPs(context.Context, *BackfillNodeIPsRequest) (*BackfillNodeIPsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BackfillNodeIPs not implemented")
+}
+func (UnimplementedHeadscaleServiceServer) SetNodeIP(context.Context, *SetNodeIPRequest) (*SetNodeIPResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetNodeIP not implemented")
 }
 func (UnimplementedHeadscaleServiceServer) AuthRegister(context.Context, *AuthRegisterRequest) (*AuthRegisterResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AuthRegister not implemented")
@@ -856,6 +872,24 @@ func _HeadscaleService_BackfillNodeIPs_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _HeadscaleService_SetNodeIP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetNodeIPRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HeadscaleServiceServer).SetNodeIP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HeadscaleService_SetNodeIP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HeadscaleServiceServer).SetNodeIP(ctx, req.(*SetNodeIPRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _HeadscaleService_AuthRegister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AuthRegisterRequest)
 	if err := dec(in); err != nil {
@@ -1114,6 +1148,10 @@ var HeadscaleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BackfillNodeIPs",
 			Handler:    _HeadscaleService_BackfillNodeIPs_Handler,
+		},
+		{
+			MethodName: "SetNodeIP",
+			Handler:    _HeadscaleService_SetNodeIP_Handler,
 		},
 		{
 			MethodName: "AuthRegister",
